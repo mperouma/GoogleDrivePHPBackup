@@ -1,0 +1,45 @@
+<?php 
+/** Don't forget to create your GOOGLE API KEY, to place the credentials.json in the same dir as this script and to run composer update to get all dependancies */
+/** NOTICE: On the first call, you will have a command line prompt to enter a code */
+
+/** THIS VERSION OF THE SCRIPT DOES NOT CREATE A FOLDER ON GDRIVE. **/
+//If you want to put your backup in a specific folder, use FOLDER_ID attribute. 
+//If not set, backups will be put at the root of your GDrive
+
+//TO ADD TO CRONTAB
+//Ex to run the job every monday at 19:30
+//30 19 * * 1 php <dir of install>/run.php
+
+global $credPath;
+$credPath=__DIR__ ."/credentials.json";
+global $tokenPath;
+$tokenPath= __DIR__ ."/token.json";
+
+/** CONFIGURATION PARAMETERS */
+$TMP_DIR="TEMPORARY DIR TO WRITE BACKUPS WITH TRAILING SLASH";
+$date = new DateTime();
+$file_suffix= $date->format("Y.m.d.H.i.s");
+global $wp_site;
+$wp_site=array();
+$i=0;
+
+//Will be used for archive basename, please use only letters and numbers
+$wp_site[$i]["BASE_NAME"]="MyWebsite";
+$wp_site[$i]["HOME_DIR"]="Home dir of your website without the trailing slash";
+$wp_site[$i]["DB_NAME"]="";
+$wp_site[$i]["DB_HOST"]="";
+$wp_site[$i]["DB_USER"]="";
+$wp_site[$i]["DB_PASS"]="";
+//For future use, at this stage only mysql type is supported
+$wp_site[$i]["DB_TYPE"]="mysql";
+
+//Only GZip compression available. For the DIR, the final file will be in tar.gz
+$wp_site[$i]["BACKUP_DB_FILE"]=$TMP_DIR.$wp_site[$i]["BASE_NAME"].".DB.".$file_suffix.".gz";
+$wp_site[$i]["BACKUP_SITE_FILE"]=$TMP_DIR.$wp_site[$i]["BASE_NAME"].".SITE.".$file_suffix.".tar";
+
+//The folder ID is the last part of the URL when you access your folder on a web browser
+$wp_site[$i]["FOLDER_ID"]="Your GOOGLE Drive ID";
+
+$i++;
+
+?>

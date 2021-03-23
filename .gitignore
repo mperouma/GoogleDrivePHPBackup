@@ -1,0 +1,8 @@
+BACKUP/
+vendor/
+config.php
+config.DEV.php
+credentials.json
+token.json
+test_config.php
+composer.lock
