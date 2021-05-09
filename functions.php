@@ -7,6 +7,18 @@ if (php_sapi_name() != 'cli') {
 }
 
 /**
+	Adds an horodated line of log to the website logfile
+*/
+function logEvent($site_info, $message){
+	$date = new DateTime();
+	$timestamp = "[".$date->format("Y-m-d H:i:s")."]";
+	$fp = fopen($site_info["LOG_SITE_FILE"],"a");
+	fprintf($fp,"%s %s",$timestamp,$message."\n");
+	fclose($fp);
+}
+
+
+/**
  * GZIPs a file on disk (appending .gz to the name)
  *
  * From http://stackoverflow.com/questions/6073397/how-do-you-create-a-gz-file-using-php
@@ -44,14 +56,21 @@ function gzCompressFile($source, $dest, $level = 9){
 * The destination dir is $TMP_DIR
 */
 function backup_db($site_info){
+	logEvent($site_info,"Starting db backup of ".$site_info["BASE_NAME"]);
 	switch($site_info["DB_TYPE"]){
 		case "mysql":
 		default:
 			//Create DB Connection using mysqli
+			mysqli_report(MYSQLI_REPORT_STRICT);
+			try{
 			$mysqli = new mysqli($site_info["DB_HOST"],$site_info["DB_USER"],$site_info["DB_PASS"],$site_info["DB_NAME"]); 
 			$mysqli->select_db($site_info["DB_NAME"]); 
 			$mysqli->query("SET NAMES 'utf8'");
-			$queryTables  = $mysqli->query('SHOW TABLES'); 
+			$queryTables  = $mysqli->query('SHOW TABLES');
+			} catch (Exception $e){
+				logEvent($site_info,"An error has occured when connecting to db ".$site_info["DB_NAME"]."\n\t ".$e->getMessage());
+				return NULL;
+			}
 			
 			while($row = $queryTables->fetch_row()) 
 				$target_tables[] = $row[0]; 
@@ -111,6 +130,7 @@ function backup_db($site_info){
 			$backupGz = gzCompressFile($backup_name, $site_info["BACKUP_DB_FILE"]);
 			if(!empty($backupGz))
 			{
+				logEvent($site_info,"[OK] DB backup file created with success for ".$site_info["DB_NAME"]."!\n\t ".$backupGz);
 				unlink($backup_name);
 				return $backupGz;
 			}
@@ -128,10 +148,16 @@ function backup_db($site_info){
 * The destination dir is $TMP_DIR
 */
 function backup_sitedir($site_info){
+	try{
 	$archive = new PharData($site_info["BACKUP_SITE_FILE"]);
 	$archive->buildFromDirectory($site_info["HOME_DIR"]); // make path\to\archive\arch1.tar
 	$archive->compress(Phar::GZ); // make path\to\archive\arch1.tar.gz
+	} catch (Exception $e){
+		logEvent($site_info,"An error has occured when creating ".$site_info["BACKUP_SITE_FILE"]."\n\t ".$e->getMessage());
+		return NULL;
+	}
 	unlink($site_info["BACKUP_SITE_FILE"]); // deleting path\to\archive\arch1.tar
+	logEvent($site_info,"[OK] Site backup file created with success for ".$site_info["DB_NAME"]."!\n\t ".$site_info["BACKUP_SITE_FILE"].".gz");
 	return $site_info["BACKUP_SITE_FILE"].".gz";
 }
 
@@ -194,14 +220,23 @@ function getClient($credPath,$tokenPath)
 */
 
 function create_backup($site_info, $credPath, $tokenPath){
+	logEvent($site_info,"Creating backup of ".$site_info["BASE_NAME"]);
 	// Get the API client and construct the service object.
-	$client = getClient($credPath, $tokenPath);
-	$service = new Google_Service_Drive($client);
-	//var_dump($site_info);
+	logEvent($site_info,"Getting Google and API service client ".$site_info["BASE_NAME"]);
+	try{
+		$client = getClient($credPath, $tokenPath);
+		$service = new Google_Service_Drive($client);
+	}catch (Exception $e){
+		logEvent($site_info,"An error has occured when accessing to GDrive\n\t ".$e->getMessage());
+		return NULL;
+	}
 	$fTup=array();
 	$fTup["BACKUP_DB_FILE"] = backup_db($site_info);
 	$fTup["BACKUP_SITE_FILE"] = backup_sitedir($site_info);
-	//var_dump($fTup);
+	if(is_null($fTup["BACKUP_DB_FILE"]) || is_null($fTup["BACKUP_SITE_FILE"])){
+		logEvent($site_info,"[FAIL] Backup of site ".$site_info["BASE_NAME"]." has failed !");
+		return NULL;
+	}
 	
 	foreach($fTup as $key => $fileUp){
 		if(!empty($fileUp)){
